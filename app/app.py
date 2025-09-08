@@ -1,11 +1,14 @@
+import asyncio, random
 from typing import Annotated, Literal
+from sqlalchemy.orm import Session
 
 
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 import os, sys, json
 import httpx, time, requests
-from fastapi.responses import  StreamingResponse, JSONResponse, Response
+from fastapi.responses import  StreamingResponse, JSONResponse, Response, FileResponse
 from typing import Optional, List, Dict, Any
 
 from contextlib import asynccontextmanager
@@ -19,6 +22,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Import our custom modules
+from database import (
+    create_tables, get_db, create_chat_session, get_chat_session,
+    get_all_chat_sessions, add_message, get_session_messages,
+    delete_chat_session, update_session_title, ChatSession, Message
+)
+from ollama_service import (
+    get_ollama_service, close_ollama_service, OllamaService,
+    OllamaConnectionError, OllamaModelError
+)
 
 
 class FilterParams(BaseModel):
@@ -28,6 +41,48 @@ class FilterParams(BaseModel):
     offset: int = Field(0, ge=0)
     order_by: Literal["created_at", "updated_at"] = "created_at"
     tags: list[str] = []
+
+
+class ChatMessage(BaseModel):
+    """Model for individual chat messages."""
+    role: str = Field(..., description="Message role: 'user' or 'assistant'")
+    content: str = Field(..., description="Message content")
+    timestamp: Optional[str] = Field(None, description="Message timestamp")
+
+
+class ChatSessionCreate(BaseModel):
+    """Model for creating new chat sessions."""
+    title: Optional[str] = Field("New Chat", description="Session title")
+    model_name: str = Field(..., description="LLM model to use")
+
+
+class ChatSessionResponse(BaseModel):
+    """Model for chat session data returned to frontend."""
+    id: int
+    title: str
+    model_name: str
+    created_at: str
+    updated_at: str
+    message_count: int
+
+
+class SendMessageRequest(BaseModel):
+    """Model for sending messages to chat sessions."""
+    content: str = Field(..., description="User message content")
+    stream: bool = Field(True, description="Whether to stream the response")
+
+
+class UpdateSessionTitleRequest(BaseModel):
+    """Model for updating session titles."""
+    title: str = Field(..., min_length=1, max_length=255, description="New session title")
+
+
+class HealthResponse(BaseModel):
+    """Model for health check responses."""
+    status: str
+    timestamp: str
+    ollama_connected: bool
+    database_connected: bool
 
 
 
@@ -82,12 +137,44 @@ from app.utils.logger import logger
 
 OLLAMA_BASE = os.getenv('OLLAMA_BASE', 'http://ollama:11434')
 DEFAULT_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
+FAVICON_PATH = 'favicon.ico'
 
+# Application lifecycle management
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Not needed if you setup a migration system like Alembic
-    await create_db_and_tables()
+    """
+Application lifespan manager.
+Handles startup and shutdown tasks like database initialization.
+    """
+    # Startup
+    print("🚀 Starting Local LLM Network Gateway...")
+
+    # Create database tables
+    try:
+        create_tables()
+        await create_db_and_tables()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        raise
+
+    # Test Ollama connection
+    try:
+        ollama = await get_ollama_service()
+        is_healthy = await ollama.health_check()
+        if is_healthy:
+            print("✅ Ollama connection verified")
+        else:
+            print("⚠️ Warning: Ollama service not responding")
+    except Exception as e:
+        print(f"⚠️ Warning: Could not connect to Ollama: {e}")
+
     yield
+
+    # Shutdown
+    print("🛑 Shutting down Local LLM Network Gateway...")
+    await close_ollama_service()
+
 
 print(OLLAMA_BASE)
 app = FastAPI(lifespan=lifespan)
@@ -133,6 +220,8 @@ app.include_router(
     prefix="/auth/google",
     tags=["auth"],
 )
+
+
 
 
 @app.get("/authenticated-route")
@@ -392,19 +481,429 @@ def get_query(background_tasks: BackgroundTasks, q: str | None = None):
     return q
 
 
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    return FileResponse(FAVICON_PATH)
 
-@app.get("/health")
-async def models():
+
+@app.get("", response_model=HealthResponse)
+@app.get("/", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """
+Health check endpoint to verify service status.
+Tests both database and Ollama connectivity.
+    """
+    ollama_connected = False
+    database_connected = False
+
+    # Test Ollama connection
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{OLLAMA_BASE}/api/tags")
-            models = response.json()
-            if len(models.get("models", [])):
-              return True
+        ollama = await get_ollama_service()
+        ollama_connected = await ollama.health_check()
 
+        models = await get_available_models()
+        random.shuffle(models)
+        model = models[0]
+        messages = []
+        title = await ollama.generate_title(model,model)
+
+
+        logger.info(f"[{title}][{self.model}] ")
 
     except Exception as e:
-        return False
+
+        logger.info(f"[{e}][] ")
+        pass
+
+    # Test database connection
+    try:
+        # Simple database query to test connectivity
+        db = next(get_db())
+        database_connected = True
+        db.close()
+    except Exception as e:
+
+        logger.info(f"[{e}][] ")
+        pass
+
+    status = "healthy" if (ollama_connected and database_connected) else "degraded"
+
+    return HealthResponse(
+        status=status,
+        timestamp=datetime.utcnow().isoformat(),
+        ollama_connected=ollama_connected,
+        database_connected=database_connected
+    )
+
+
+
+@app.get("/api/models")
+async def get_available_models():
+    """
+Get list of available LLM models from Ollama.
+Returns model information including name, size, and last modified date.
+    """
+    try:
+        ollama = await get_ollama_service()
+        models = await ollama.get_available_models()
+        return {"models": models}
+    except OllamaConnectionError as e:
+        raise HTTPException(status_code=503, detail=f"Ollama service unavailable: {e}")
+    except OllamaModelError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {e}")
+
+
+
+
+
+@app.get("/api/sessions", response_model=List[ChatSessionResponse])
+async def get_chat_sessions(db: Session = Depends(get_db)):
+    """
+Get all chat sessions with basic information.
+Returns sessions ordered by most recent activity.
+    """
+    try:
+        sessions = get_all_chat_sessions(db)
+        response = []
+
+        for session in sessions:
+            response.append(ChatSessionResponse(
+                                id=session.id,
+                                title=session.title,
+                                model_name=session.model_name,
+                                created_at=session.created_at.isoformat(),
+                                updated_at=session.updated_at.isoformat(),
+                                message_count=len(session.messages)
+                            ))
+
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve sessions: {e}")
+
+
+@app.post("/api/sessions", response_model=ChatSessionResponse)
+async def create_new_chat_session(
+        session_data: ChatSessionCreate,
+        db: Session = Depends(get_db)
+):
+    """
+Create a new chat session with specified model.
+Validates that the model is available in Ollama.
+    """
+    try:
+        # Validate model exists
+        ollama = await get_ollama_service()
+        if not await ollama.validate_model(session_data.model_name):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{session_data.model_name}' is not available"
+            )
+
+        # Create session in database
+        session = create_chat_session(db, session_data.title, session_data.model_name)
+
+        return ChatSessionResponse(
+            id=session.id,
+            title=session.title,
+            model_name=session.model_name,
+            created_at=session.created_at.isoformat(),
+            updated_at=session.updated_at.isoformat(),
+            message_count=0
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {e}")
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_chat_session_details(session_id: int, db: Session = Depends(get_db)):
+    """
+Get detailed information about a specific chat session including messages.
+    """
+    try:
+        session = get_chat_session(db, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+        messages = get_session_messages(db, session_id)
+        message_list = []
+
+        for msg in messages:
+            message_list.append({
+                "id": msg.id,
+                "role": msg.role,
+                "content": msg.content,
+                "timestamp": msg.created_at.isoformat()
+            })
+
+        return {
+            "id": session.id,
+            "title": session.title,
+            "model_name": session.model_name,
+            "created_at": session.created_at.isoformat(),
+            "updated_at": session.updated_at.isoformat(),
+            "messages": message_list
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve session: {e}")
+
+
+@app.post("/api/sessions/{session_id}/messages")
+async def send_message(
+        session_id: int,
+        message_data: SendMessageRequest,
+        background_tasks: BackgroundTasks,
+        db: Session = Depends(get_db)
+):
+    """
+Send a message to a chat session and get LLM response.
+Supports both streaming and non-streaming responses.
+    """
+    try:
+        # Verify session exists
+        session = get_chat_session(db, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+        # Store user message
+        user_message = add_message(db, session_id, "user", message_data.content)
+
+        # Get conversation history for context
+        messages = get_session_messages(db, session_id, limit=20)  # Last 20 messages
+        conversation_history = []
+
+        for msg in messages:
+            conversation_history.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+
+        # Get Ollama service and send request
+        ollama = await get_ollama_service()
+
+        if message_data.stream:
+            # Return streaming response
+            return StreamingResponse(
+                stream_chat_response(ollama, session, conversation_history, db, session_id),
+                media_type="text/plain"
+            )
+        else:
+            # Return complete response
+            response_content = ""
+            async for chunk in ollama.chat_completion(
+                session.model_name,
+                conversation_history,
+                stream=False
+            ):
+                response_content = chunk.get("message", {}).get("content", "")
+
+            # Store assistant response
+            assistant_message = add_message(db, session_id, "assistant", response_content)
+
+            # Update session title if this is the first exchange
+            if len(messages) <= 2:  # User message + assistant response
+                background_tasks.add_task(
+                    update_session_title_async,
+                    db, session_id, ollama, session.model_name, message_data.content
+                )
+
+            return {
+                "user_message": {
+                    "id": user_message.id,
+                    "content": user_message.content,
+                    "timestamp": user_message.created_at.isoformat()
+                },
+                "assistant_message": {
+                    "id": assistant_message.id,
+                    "content": assistant_message.content,
+                    "timestamp": assistant_message.created_at.isoformat()
+                }
+            }
+
+    except HTTPException:
+        raise
+    except OllamaConnectionError as e:
+        raise HTTPException(status_code=503, detail=f"LLM service unavailable: {e}")
+    except OllamaModelError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process message: {e}")
+
+
+async def stream_chat_response(
+        ollama: OllamaService,
+        session: ChatSession,
+        conversation_history: List[Dict[str, str]],
+        db: Session,
+        session_id: int
+):
+    """
+Generator function for streaming chat responses.
+Handles real-time LLM response streaming and database updates.
+    """
+    response_content = ""
+
+    try:
+        async for chunk in ollama.chat_completion(
+            session.model_name,
+            conversation_history,
+            stream=True
+        ):
+            # Extract content from chunk
+            if "message" in chunk:
+                content = chunk["message"].get("content", "")
+                if content:
+                    response_content += content
+                    # Send chunk to frontend
+                    yield f"data: {json.dumps({'content': content, 'type': 'chunk'})}\n\n"
+
+            # Check if response is complete
+            if chunk.get("done", False):
+                # Store complete assistant response in database
+                if response_content.strip():
+                    add_message(db, session_id, "assistant", response_content)
+
+                # Generate title if this is the first exchange
+                message_count = len(get_session_messages(db, session_id))
+                if message_count <= 2:
+                    asyncio.create_task(
+                        update_session_title_async(
+                            db, session_id, ollama, session.model_name,
+                            conversation_history[-1]["content"]
+                        )
+                    )
+
+                # Send completion signal
+                yield f"data: {json.dumps({'type': 'done', 'message_id': None})}\n\n"
+                break
+
+    except Exception as e:
+        # Send error to frontend
+        yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+
+async def update_session_title_async(
+        db: Session,
+        session_id: int,
+        ollama: OllamaService,
+        model_name: str,
+        first_message: str
+):
+    """
+Background task to generate and update session title.
+    """
+    try:
+        title = await ollama.generate_title(model_name, first_message)
+        update_session_title(db, session_id, title)
+    except Exception:
+        pass  # Silently fail title generation
+
+
+@app.put("/api/sessions/{session_id}/title")
+async def update_chat_session_title(
+        session_id: int,
+        title_data: UpdateSessionTitleRequest,
+        db: Session = Depends(get_db)
+):
+    """
+Update the title of a chat session.
+    """
+    try:
+        success = update_session_title(db, session_id, title_data.title)
+        if not success:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+        return {"message": "Session title updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update title: {e}")
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_chat_session_endpoint(session_id: int, db: Session = Depends(get_db)):
+    """
+Delete a chat session and all its messages.
+    """
+    try:
+        success = delete_chat_session(db, session_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+        return {"message": "Chat session deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete session: {e}")
+
+
+@app.get("/api/sessions/{session_id}/export")
+async def export_chat_session(session_id: int, db: Session = Depends(get_db)):
+    """
+Export chat session as JSON for backup or sharing.
+    """
+    try:
+        session = get_chat_session(db, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+        messages = get_session_messages(db, session_id)
+
+        export_data = {
+            "session": {
+                "id": session.id,
+                "title": session.title,
+                "model_name": session.model_name,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat()
+            },
+            "messages": [
+                {
+                    "role": msg.role,
+                    "content": msg.content,
+                    "timestamp": msg.created_at.isoformat()
+                }
+                for msg in messages
+            ],
+            "export_timestamp": datetime.utcnow().isoformat()
+        }
+
+        return JSONResponse(
+            content=export_data,
+            headers={"Content-Disposition": f"attachment; filename=chat_{session_id}.json"}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export session: {e}")
+
+
+# Error handlers for better user experience
+
+@app.exception_handler(404)
+async def not_found_handler(request, exc):
+    """Custom 404 error handler."""
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Endpoint not found", "path": str(request.url)}
+    )
+
+
+@app.exception_handler(500)
+async def internal_error_handler(request, exc):
+    """Custom 500 error handler."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error occurred"}
+    )
+
+
 
 @app.post("/task/send-notification/{email}")
 async def send_notification(
