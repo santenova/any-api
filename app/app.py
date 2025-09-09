@@ -275,12 +275,12 @@ def list_concepts(in_model: str,prompt: str, amount: int):
         model = in_model
 
       message = """
-                 write a company presentation book about only-agent.ai a startup,\n
-                 with a saas platform and AI agents to buy,\n
-                 create a list of 100 creative points to help the startup to succseed\n
-                 the startup is not fully funded yet\n
-                 there looking for suitable products to add to there shop\n
-                 the purpose of the book is to attract seed investors to the startup\n\n
+write a company presentation book about only-agent.ai a startup
+with a saas platform and AI agents to buy
+create a list of 100 creative points to help the startup to succseed
+the startup is not fully funded yet
+there looking for suitable products to add to there shop
+the purpose of the book is to attract seed investors to the startup
                 """
 
       if prompt is None:
@@ -356,7 +356,7 @@ def custom_lake(prompt: Prompt):
     agent = agent_manager.get_agent("hub_products")
 
 
-    out = {} #agent.execute(request_data,agent_manager.model,prompt,1,amount)
+    out = agent.execute(request_data,agent_manager.model,prompt,1,amount)
 
     return JSONResponse(
             content=[request_data,out]
@@ -408,9 +408,42 @@ async def list_settings(request: Request):
 
 
 @app.get("/agent/create_book")
-async def create_book():
+async def create_book(in_model: str,prompt: str, amount: int):
     try:
-      return {}
+
+      if in_model is None:
+        model = DEFAULT_MODEL
+      else:
+        model = in_model
+
+      message = """
+write a company presentation book about only-agent.ai a startup
+with a saas platform and AI agents to buy
+create a list of 100 creative points to help the startup to succseed
+the startup is not fully funded yet
+there looking for suitable products to add to there shop
+the purpose of the book is to attract seed investors to the startup
+                """
+
+      if prompt is None:
+        prompt = message
+
+      concept = prompt
+
+
+
+      request_data = {"prompt":prompt}
+
+      agent_manager = AgentManager(max_retries=2, verbose=True)
+      agent = agent_manager.get_agent("write_book")
+
+
+      out = agent.execute(prompt)
+
+      return JSONResponse(
+              content=[request_data,out]
+          )
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

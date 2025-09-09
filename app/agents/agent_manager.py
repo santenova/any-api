@@ -1,12 +1,6 @@
 import random
-from .summarize_tool import SummarizeTool
+
 from .write_book_tool import WriteBookTool
-from .sanitize_data_tool import SanitizeDataTool
-from .summarize_validator_agent import SummarizeValidatorAgent
-from .write_book_validator_agent import WriteBookValidatorAgent
-from .sanitize_data_validator_agent import SanitizeDataValidatorAgent
-from .refiner_agent import RefinerAgent
-from .validator_agent import ValidatorAgent
 from .concept_agent import ConceptAgent
 from .models_agent import ModelsAgent
 
@@ -20,10 +14,10 @@ from .hub_review_agent import HubReviewAgent
 from .hub_assign_agent import HubAssignAgent
 from .hub_products_agent import HubProductsAgent
 from .hub_contributions_agent import HubContributionsAgent
-from .extract_outline_tool import OutlineTool
 
 class AgentManager:
     def __init__(self, max_retries=2, verbose=True):
+        """
         """
         self.models = ModelsAgent( max_retries=max_retries, verbose=verbose).execute()
 
@@ -31,24 +25,15 @@ class AgentManager:
 
 
         random.shuffle(model_names)
-        """
-        self.model = "gemma3:12b"
-        #model_names[0]
 
-        #print(self.model)
+        self.model = model_names[0]
+
+        print(self.model)
 
 
         self.agents = {
-            "summarize": SummarizeTool( max_retries=max_retries, verbose=verbose),
-            "write_book": WriteBookTool( max_retries=max_retries, verbose=verbose),
-            "sanitize_data": SanitizeDataTool( max_retries=max_retries, verbose=verbose),
-            "summarize_validator": SummarizeValidatorAgent( max_retries=max_retries, verbose=verbose),
-            "outline_tool": OutlineTool( max_retries=max_retries, verbose=verbose),
-            "write_book_validator": WriteBookValidatorAgent( max_retries=max_retries, verbose=verbose),
-            "sanitize_data_validator": SanitizeDataValidatorAgent( max_retries=max_retries, verbose=verbose),
-            "refiner": RefinerAgent( max_retries=max_retries, verbose=verbose),
-            "validator": ValidatorAgent( max_retries=max_retries, verbose=verbose),
             "concept_tool": ConceptAgent( max_retries=max_retries, verbose=verbose),
+            "write_book": WriteBookTool( max_retries=max_retries, verbose=verbose),
             "models": ModelsAgent( max_retries=max_retries, verbose=verbose),
             # New hub command agents
             "hub_base": HubBaseAgent( max_retries=max_retries, verbose=verbose),
@@ -62,13 +47,10 @@ class AgentManager:
         }
 
     def get_agent(self, agent_name, model_name=None):
-
-
         if model_name == None:
           model_name=self.model
 
         agent = self.agents.get(agent_name)
-
         if not agent:
             raise ValueError(f"Agent '{agent_name}' not found.")
 
