@@ -72,12 +72,7 @@ curl -X 'POST' \
   "prompt": "AI Agents",
   "amount": 1
 }'
-
-curl -X 'GET' \
-  'http://0.0.0.0:8000/agent/create_book' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
+curl -X 'POST'   'http://0.0.0.0:8000/agent/create_book'   -H 'accept: application/json'   -H 'Content-Type: application/json'   -d '{
   "model":  "qwen3:0.6b",
   "prompt": "AI Agents",
   "amount": 1
