@@ -134,13 +134,48 @@ class WriteBookTool(AgentBase):
         summary = self.call_llama(messages, max_tokens=512)
         return summary
 
+    def conceptual(self, text):
+      messages = [
+            {"role": "system", "content": "You are an AI assistant that creates concept lists from text."},
+            {
+                "role": "user",
+                "content": f"""
+Starting with the concept: "{text}", generate {1} to 30, of the most close related instances to our Starting concept.
+#
+Guidelines:
+1. Seek maximum intellectual diversity - span across domains like science, art, philosophy, technology, culture, etc.
+2. Each concept should be expressed in 1-5 words (shorter is better)
+3. Avoid obvious associations - prefer surprising or thought-provoking connections
+4. Consider how your suggested concepts relate to BOTH:
+   - The immediate parent concept "{text}"
+5. Consider these different types of relationships:
+   - Metaphorical parallels
+   - Contrasting opposites
+   - Historical connections
+   - Philosophical implications
+   - Cross-disciplinary applications
+
+Avoid any concepts already in the path. Be creative but maintain meaningful connections.
+
+Return ONLY a JSON array of strings, with no explanation or additional text.
+Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Related concept 4","Related concept 5", "Related concept 6", "Related concept 7", "Related concept 8"]
+        """
+            }
+        ]
+
+
+      summary = self.call_llama(messages, max_tokens=512)
+      return summary
 
 
     def execute(self, topic, outline=None):
-        system_message = "You are an expert academic writer."
+        system_message = "You are an expert writer."
         user_content = f"Write a research book on the following topic:\nTopic: {topic}\n\n"
-        if outline:
+        if outline is None:
+            outline = self.conceptual(topic)
             user_content += f"Outline:\n{outline}\n\n"
+
+
         user_content += "Book:\n"
         messages = [
             {"role": "system", "content": system_message},
@@ -149,6 +184,8 @@ class WriteBookTool(AgentBase):
 
         #book = self.call_llama(messages, max_tokens=1000,format=BookList.model_json_schema())
         book = self.call_llama(messages, max_tokens=1024)
+        #book += self.conceptual(topic)
+        """
         time.sleep(1000)
         book_summary = self.summarize(book)
         time.sleep(1000)
@@ -158,5 +195,11 @@ class WriteBookTool(AgentBase):
         book_validated = self.validate_book(user_content,book)
         time.sleep(1000)
         summary_validated = self.validate_summerize(book,book_summary)
+        """
+        output_file = f"data/{self.model}_{topic.lower()}_book.txt"
+
+        with open(output_file.replace(".txt",".json"), 'w', encoding='utf-8') as f:
+            json.dump([messages,output_file,book,outline], f, ensure_ascii=False, indent=4)
+
 
         return book

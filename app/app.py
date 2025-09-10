@@ -85,10 +85,21 @@ class HealthResponse(BaseModel):
     database_connected: bool
 
 
+class Prompt(BaseModel):
+    model: str
+    prompt: str
+    amount: int
 
 
 
-
+message = """
+write a company presentation book about only-agent.ai a startup
+with a saas platform and AI agents to buy
+create a list of 100 creative points to help the startup to succseed
+the startup is not fully funded yet
+there looking for suitable products to add to there shop
+the purpose of the book is to attract seed investors to the startup
+          """
 
 
 class Git:
@@ -111,6 +122,48 @@ class Agents:
 
     def agents(self):
         return {"agents": self.name}
+
+
+class Base44:
+
+    def __init__(self, name: str):
+        self.name = name
+        self.router = APIRouter()
+        self.router.get("/products")(self.products) # use decorator
+        self.router.get("/activity")(self.activity) # use decorator
+        self.router.get("/subscription")(self.subscription) # use decorator
+
+    def products(self,api_path, method='GET', data=None):
+
+      entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/Product')
+      return entities#print(entities)
+
+
+
+    def make_api_request(self, api_path, method='GET', data=None):
+        url = f'https://app.base44.com/api/{api_path}'
+        headers = {
+            'api_key': 'ef5e2e3b8e524b6d91e6e85136f86d9f',
+            'Content-Type': 'application/json'
+        }
+        if method.upper() == 'GET':
+            response = requests.request(method, url, headers=headers, params=data)
+        else:
+            response = requests.request(method, url, headers=headers, json=data)
+        response.raise_for_status()
+        return response.json()
+
+
+
+    def activity(self):
+      entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/ActivityLog')
+      return entities
+
+    def subscription(self):
+        entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/Subscription')
+        return entities
+
+
 
 class Products:
 
@@ -183,6 +236,8 @@ app = FastAPI(lifespan=lifespan)
 git = Git("World")
 app.include_router(git.router,prefix="/git",tags=["git"])
 
+base44 = Base44("base44 World")
+app.include_router(base44.router,prefix="/base44",tags=["base44"])
 
 products = Products("World")
 app.include_router(products.router,prefix="/products",tags=["products"])
@@ -266,33 +321,28 @@ async def update_item(
 
 
 @app.post("/agent/concepts")
-def list_concepts(in_model: str,prompt: str, amount: int):
-    try:
+def list_concepts(prompt: Prompt):
 
-      if in_model is None:
-        model = DEFAULT_MODEL
-      else:
-        model = in_model
 
-      message = """
-write a company presentation book about only-agent.ai a startup
-with a saas platform and AI agents to buy
-create a list of 100 creative points to help the startup to succseed
-the startup is not fully funded yet
-there looking for suitable products to add to there shop
-the purpose of the book is to attract seed investors to the startup
-                """
+    if prompt.model is None:
+      model = DEFAULT_MODEL
+    else:
+      model = prompt.model
 
-      if prompt is None:
-        prompt = message
+    # Set the root concept and model
+    if prompt.prompt is None:
+      prompt.prompt = "How to make most easy revenue with AI Agents as a startup, convince seed investors"  # Default root concept
 
-      concept = prompt
-      # Full path to current concept, including the concept itself
-      full_path = [concept]
-      amount = 20
+    if prompt.amount is None:
+      prompt.amount = 10
 
-      # Prompt
-      prompt = f"""
+    concept = prompt.prompt
+    # Full path to current concept, including the concept itself
+    full_path = [concept]
+    amount = 20
+
+    # Prompt
+    prompt = f"""
 Starting with the concept: "{concept}", generate {amount} to 50, of the most close related concepts to our Starting concept.
 
 Context: We're building a concept web and have followed this path to get here:
@@ -303,40 +353,31 @@ Guidelines:
 2. Each concept should be expressed in 1-5 words (shorter is better)
 3. Avoid obvious associations - prefer surprising or thought-provoking connections
 4. Consider how your suggested concepts relate to BOTH:
- - The immediate parent concept "{concept}"
- - The overall path context: {' → '.join(full_path)}
+- The immediate parent concept "{concept}"
+- The overall path context: {' → '.join(full_path)}
 5. Consider these different types of relationships:
- - Metaphorical parallels
- - Contrasting opposites
- - Historical connections
- - Philosophical implications
- - Cross-disciplinary applications
+- Metaphorical parallels
+- Contrasting opposites
+- Historical connections
+- Philosophical implications
+- Cross-disciplinary applications
 
 Avoid any concepts already in the path. Be creative but maintain meaningful connections.
 
 Return ONLY a JSON array of strings, with no explanation or additional text.
 Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Related concept 4","Related concept 5", "Related concept 6", "Related concept 7", "Related concept 8"]
-      """
+    """
 
 
-      res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
-        "prompt": prompt,
-        "stream" : False,
-        "model" : model
-      })
+    res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
+      "prompt": prompt,
+      "stream" : False,
+      "model" : model
+    })
 
-      return Response(content=res.text, media_type="application/json")
-      #return {}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return JSONResponse(content=res.text)
+    #return {}
 
-
-from pydantic import BaseModel
-
-
-class Prompt(BaseModel):
-    prompt: str
-    amount: int
 
 
 @app.post("/custom")
@@ -356,10 +397,10 @@ def custom_lake(prompt: Prompt):
     agent = agent_manager.get_agent("hub_products")
 
 
-    out = agent.execute(request_data,agent_manager.model,prompt,1,amount)
+    out = agent.execute(agent_manager.model,prompt.prompt,1,prompt.amount)
 
     return JSONResponse(
-            content=[request_data,out]
+            content=out
         )
 
   except Exception as e:
@@ -370,65 +411,43 @@ def custom_lake(prompt: Prompt):
 
 
 @app.post("/agent/chat")
-async def list_settings(request: Request):
+def agent_chat(prompt: Prompt):
     try:
 
-      request_data = await request.json()
-      if request_data is  None:
-        request_data = "{}"
+      if prompt.model is None:
+        model = DEFAULT_MODEL
+      else:
+        model = prompt.model
 
-
-
-
-      model = request_data.get('model', DEFAULT_MODEL)
-
-
-      message = """
-               write a company presentation book about only-agent.ai a startup,\n
-               with a saas platform and AI agents to buy,\n
-               create a list of 100 creative points to help the startup to succseed\n
-               the startup is not fully funded yet\n
-               there looking for suitable products to add to there shop\n
-               the purpose of the book is to attract seed investors to the startup\n\n
-               """
-
-      prompt = request_data.get('prompt', message)
+      if prompt.prompt is None:
+        prompt.prompt = message
 
 
       res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
-        "prompt": prompt,
+        "prompt": prompt.prompt,
         "stream" : False,
         "model" : model
       })
 
-      return Response(content=res.text, media_type="application/json")
-      #return {}
+      return JSONResponse(content=res.text)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/agent/create_book")
-async def create_book(in_model: str,prompt: str, amount: int):
+@app.post("/agent/create_book")
+async def create_book(prompt: Prompt):
     try:
 
-      if in_model is None:
+      if prompt.model is None:
         model = DEFAULT_MODEL
       else:
-        model = in_model
+        model = prompt.model
 
-      message = """
-write a company presentation book about only-agent.ai a startup
-with a saas platform and AI agents to buy
-create a list of 100 creative points to help the startup to succseed
-the startup is not fully funded yet
-there looking for suitable products to add to there shop
-the purpose of the book is to attract seed investors to the startup
-                """
+      if prompt.prompt is None:
+        prompt.prompt = message
 
-      if prompt is None:
-        prompt = message
-
-      concept = prompt
+      concept = prompt.prompt
 
 
 
@@ -438,10 +457,10 @@ the purpose of the book is to attract seed investors to the startup
       agent = agent_manager.get_agent("write_book")
 
 
-      out = agent.execute(prompt)
+      out = agent.execute(prompt.prompt)
 
       return JSONResponse(
-              content=[request_data,out]
+              content=out
           )
 
     except Exception as e:

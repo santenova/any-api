@@ -20,7 +20,7 @@ class AgentBase(ABC):
         return self
 
 
-    def call_llama(self, messages, temperature=0.7, max_tokens=150, format=None,model = 'phi4:14b'):
+    def call_llama(self, messages, temperature=0.7, max_tokens=150, format=None,model = 'qwen2.5-coder:0.5b'):
         """
         Calls the Llama model via Ollama and retrieves the response.
 

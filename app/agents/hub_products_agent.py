@@ -26,6 +26,10 @@ from ..utils.logger import logger
 # Initialize colorama
 init(autoreset=True)
 
+OLLAMA_BASE = os.getenv('OLLAMA_BASE')
+DEFAULT_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
+FAVICON_PATH = 'favicon.ico'
+
 class ProductExplorer:
     def __init__(self, model="qwen2:7b"):
         self.graph = nx.DiGraph()
@@ -363,10 +367,10 @@ Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Relate
 
                 # Flash each new addition with a brief pause
                 self.update_live_tree(focus_node=rel_concept, max_display_depth=display_depth)
-                time.sleep(0.15)
+                time.sleep(0.55)
 
             # Rate limiting for Ollama
-            time.sleep(0.15)
+            time.sleep(0.55)
 
 
         # Final full tree display
@@ -459,7 +463,7 @@ class HubProductsAgent(AgentBase):
 
 
 
-    def execute(self,request: Request, model,root_concept, max_depth, amount):
+    def execute(self, model,root_concept, max_depth, amount):
         system_message = "You are an expert software testing and quality assurance agent."
         user_content = f"Analyze test coverage and quality for a repository\n\n"
         user_content += "Provide insights on:\n"
@@ -487,7 +491,10 @@ class HubProductsAgent(AgentBase):
 
 
           out  = explorer.build_concept_web(root_concept, max_depth=max_depth, diversity_bias=diversity_level, amount=amount)
-
+          # Export ASCII tree to file
+          output_file = f"data/{self.model}_{root_concept.lower()}_concept_web.json"
+          explorer.export_ascii_tree(output_file,out)
+          return out
 
         except Exception as e:
           logger.error(f"Error: {str(e)}")
