@@ -31,7 +31,7 @@ python3.10 main.py
 
 
 
-## Make sure you run `ollama serve` (this is OpenAI-compatible http://ollama:11434)
+## Make sure you env is ready for docker
 
 
 ```
@@ -60,7 +60,7 @@ curl -X 'GET' \
 
 curl -X 'GET' \
   'http://localhost:8000/agent/models' \
-  -H 'accept: application/json'
+  -H 'accept: application/json';
 
 
 curl -X 'POST' \
@@ -71,7 +71,8 @@ curl -X 'POST' \
   "model": "qwen3:0.6b",
   "prompt": "AI Agents",
   "amount": 1
-}'
+}';
+
 curl -X 'POST'   'http://0.0.0.0:8000/agent/create_book'   -H 'accept: application/json'   -H 'Content-Type: application/json'   -d '{
   "model":  "qwen3:0.6b",
   "prompt": "AI Agents",
@@ -89,7 +90,7 @@ curl -X 'POST'   'http://0.0.0.0:8000/agent/create_book'   -H 'accept: applicati
 
 ## serving
 
-  https://code-agent-1c8a6bd3.base44.app/Home
+  https://code-agent-1c8a6bd3.data.app/Home
 
-  testing credid card number
+  testing credid card number to get true paywalls
   4111 1111 1111 1111

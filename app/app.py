@@ -83,6 +83,10 @@ class HealthResponse(BaseModel):
     timestamp: str
     ollama_connected: bool
     database_connected: bool
+    data_activity: bool
+    data_subscription: bool
+    data_products: bool
+
 
 
 class Prompt(BaseModel):
@@ -133,7 +137,7 @@ class Base44:
         self.router.get("/activity")(self.activity) # use decorator
         self.router.get("/subscription")(self.subscription) # use decorator
 
-    def products(self,api_path, method='GET', data=None):
+    def products(self):
       entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/Product')
       return entities#print(entities)
 
@@ -158,7 +162,7 @@ class Base44:
       entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/ActivityLog')
       return entities
 
-    def subscription(self,api_path, method='GET', data=None):
+    def subscription(self):
         entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/Subscription')
         return entities
 
@@ -236,8 +240,8 @@ app = FastAPI(lifespan=lifespan)
 git = Git("World")
 app.include_router(git.router,prefix="/git",tags=["git"])
 
-base44 = Base44("base44 World")
-app.include_router(base44.router,prefix="/base44",tags=["base44"])
+data = Base44("data World")
+app.include_router(data.router,prefix="/data",tags=["data"])
 
 products = Products("World")
 app.include_router(products.router,prefix="/products",tags=["products"])
@@ -491,6 +495,17 @@ async def test_models():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+#@app.get("/agent/benchmark_models")
+def has_data(data):
+    try:
+      if len(data) > 0:
+        return True
+      else:
+        return False
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 #@app.get("/agent/benchmark_models")
 def benchmark_models():
@@ -551,7 +566,9 @@ Tests both database and Ollama connectivity.
 
     # Test Ollama connection
 
-    activity = Base44("base44").activity()
+    activity = Base44("data").activity()
+    products = Base44("data").products()
+    subscription = Base44("data").subscription()
     ollama = await get_ollama_service()
     ollama_connected = await ollama.health_check()
 
@@ -559,11 +576,10 @@ Tests both database and Ollama connectivity.
     random.shuffle(models)
     model = "qwen3:0.6b"
     messages = []
+    has_activity = has_data(activity)
+    has_products = has_data(products)
+    has_subscription = has_data(subscription)
     #title = await ollama.generate_title(model,"hello i am the user")
-
-
-    logger.info(activity)
-
 
     # Test database connection
     try:
@@ -582,7 +598,10 @@ Tests both database and Ollama connectivity.
         status=status,
         timestamp=datetime.utcnow().isoformat(),
         ollama_connected=ollama_connected,
-        database_connected=database_connected
+        database_connected=database_connected,
+        data_activity=has_activity,
+        data_subscription=has_subscription,
+        data_products=has_products
     )
 
 
