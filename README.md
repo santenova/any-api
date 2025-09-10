@@ -48,3 +48,39 @@ docker build -t any-api .
 docker run -p 8000:8000 -t any-api
 
 ```
+
+## Testing
+
+```
+
+curl -X 'GET' \
+  'http://0.0.0.0:8000/health' \
+  -H 'accept: application/json';
+
+
+curl -X 'GET' \
+  'http://localhost:8000/agent/models' \
+  -H 'accept: application/json'
+
+
+curl -X 'POST' \
+  'http://0.0.0.0:8000/agent/chat' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "model": "qwen3:0.6b",
+  "prompt": "AI Agents",
+  "amount": 1
+}'
+
+curl -X 'GET' \
+  'http://0.0.0.0:8000/agent/create_book' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "model":  "qwen3:0.6b",
+  "prompt": "AI Agents",
+  "amount": 1
+}'
+
+```
