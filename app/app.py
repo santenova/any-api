@@ -550,25 +550,20 @@ Tests both database and Ollama connectivity.
     database_connected = False
 
     # Test Ollama connection
-    try:
 
-        activity = Base44("base44").activity()
-        ollama = await get_ollama_service()
-        ollama_connected = await ollama.health_check()
+    activity = Base44("base44").activity()
+    ollama = await get_ollama_service()
+    ollama_connected = await ollama.health_check()
 
-        models = await get_available_models()
-        random.shuffle(models)
-        model = models[0]
-        messages = []
-        title = await ollama.generate_title(model,model)
+    models = await get_available_models()
+    random.shuffle(models)
+    model = "qwen3:0.6b"
+    messages = []
+    #title = await ollama.generate_title(model,"hello i am the user")
 
 
-        logger.info(f"[{title}][{self.model}] ")
+    logger.info(activity)
 
-    except Exception as e:
-
-        logger.info(f"[{e}][] ")
-        pass
 
     # Test database connection
     try:

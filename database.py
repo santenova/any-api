@@ -78,7 +78,7 @@ Should be called on application startup.
     """
     try:
         Base.metadata.create_all(bind=engine)
-        print("Database tables created successfully")
+        print("✅ Database tables created successfully")
     except SQLAlchemyError as e:
         print(f"Error creating database tables: {e}")
         raise
