@@ -134,7 +134,6 @@ class Base44:
         self.router.get("/subscription")(self.subscription) # use decorator
 
     def products(self,api_path, method='GET', data=None):
-
       entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/Product')
       return entities#print(entities)
 
@@ -159,7 +158,7 @@ class Base44:
       entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/ActivityLog')
       return entities
 
-    def subscription(self):
+    def subscription(self,api_path, method='GET', data=None):
         entities = self.make_api_request(f'apps/68aa4e39f2b74e241c8a6bd3/entities/Subscription')
         return entities
 
@@ -200,10 +199,11 @@ Application lifespan manager.
 Handles startup and shutdown tasks like database initialization.
     """
     # Startup
-    print("🚀 Starting Local LLM Network Gateway...")
+    print("🚀 Ollama base url: "+OLLAMA_BASE)
 
     # Create database tables
     try:
+        await health_check()
         create_tables()
         await create_db_and_tables()
         print("✅ Database initialized successfully")
@@ -229,7 +229,7 @@ Handles startup and shutdown tasks like database initialization.
     await close_ollama_service()
 
 
-print(OLLAMA_BASE)
+
 app = FastAPI(lifespan=lifespan)
 
 
@@ -551,6 +551,8 @@ Tests both database and Ollama connectivity.
 
     # Test Ollama connection
     try:
+
+        activity = Base44("base44").activity()
         ollama = await get_ollama_service()
         ollama_connected = await ollama.health_check()
 

@@ -82,6 +82,8 @@ curl -X 'POST'   'http://0.0.0.0:8000/agent/create_book'   -H 'accept: applicati
 
 ## api endpoints
 
+### check openapi http://0.0.0.0:8000/docs
+
 ![api endpoints](https://raw.githubusercontent.com/santenova/any-api/refs/heads/main/api.png)
 
 
