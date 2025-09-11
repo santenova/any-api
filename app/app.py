@@ -674,7 +674,7 @@ class Agents:
           agent = agent_manager.get_agent("write_book")
 
 
-          out = agent.execute()
+          out = agent.execute(concept)
 
           return JSONResponse(
                   content=out
