@@ -122,7 +122,233 @@ class Agents:
     def __init__(self, name: str):
         self.name = name
         self.router = APIRouter()
-        self.router.get("/agents")(self.agents) # use decorator
+        self.router.post("/concepts")(self.list_concepts) # use decorator
+        self.router.post("/custom")(self.custom_lake) # use decorator
+        self.router.post("/chat")(self.agent_chat) # use decorator
+        self.router.post("/model_meter")(self.test_models) # use decorator
+        self.router.post("/create_book")(self.create_book) # use decorator
+        self.router.post("/models")(self.models) # use decorator
+
+
+
+    #@app.post("/agent/concepts")
+    def list_concepts(self, prompt: Prompt):
+
+
+        if prompt.model is None:
+          model = DEFAULT_MODEL
+        else:
+          model = prompt.model
+
+        # Set the root concept and model
+        if prompt.prompt is None:
+          prompt.prompt = "How to make most easy revenue with AI Agents as a startup, convince seed investors"  # Default root concept
+
+        if prompt.amount is None:
+          prompt.amount = 10
+
+        concept = prompt.prompt
+        # Full path to current concept, including the concept itself
+        full_path = [concept]
+        amount = 20
+
+        # Prompt
+        prompt = f"""
+    Starting with the concept: "{concept}", generate {amount} to 50, of the most close related concepts to our Starting concept.
+
+    Context: We're building a concept web and have followed this path to get here:
+    {' → '.join(full_path)}
+
+    Guidelines:
+    1. Seek maximum intellectual diversity - span across domains like science, art, philosophy, technology, culture, etc.
+    2. Each concept should be expressed in 1-5 words (shorter is better)
+    3. Avoid obvious associations - prefer surprising or thought-provoking connections
+    4. Consider how your suggested concepts relate to BOTH:
+    - The immediate parent concept "{concept}"
+    - The overall path context: {' → '.join(full_path)}
+    5. Consider these different types of relationships:
+    - Metaphorical parallels
+    - Contrasting opposites
+    - Historical connections
+    - Philosophical implications
+    - Cross-disciplinary applications
+
+    Avoid any concepts already in the path. Be creative but maintain meaningful connections.
+
+    Return ONLY a JSON array of strings, with no explanation or additional text.
+    Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Related concept 4","Related concept 5", "Related concept 6", "Related concept 7", "Related concept 8"]
+        """
+
+
+        res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
+          "prompt": prompt,
+          "stream" : False,
+          "model" : model
+        })
+
+        return JSONResponse(content=res.text)
+        #return {}
+
+
+
+    #@app.post("/custom")
+    def custom_lake(self, prompt: Prompt):
+      try:
+
+        # Set the root concept and model
+        if prompt.prompt is None:
+          prompt.prompt = "How to make most easy revenue with AI Agents as a startup, convince seed investors"  # Default root concept
+
+        if prompt.amount is None:
+          prompt.amount = 10
+
+        request_data = {"prompt":prompt.prompt, "amount":prompt.amount}
+
+        agent_manager = AgentManager(max_retries=2, verbose=True)
+        agent = agent_manager.get_agent("hub_products")
+
+
+        out = agent.execute(agent_manager.model,prompt.prompt,1,prompt.amount)
+
+        return JSONResponse(
+                content=out
+            )
+
+      except Exception as e:
+          logger.error(f"Error listing models: {str(e)}")
+          raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+    #@app.post("/agent/chat")
+    def agent_chat(self, prompt: Prompt):
+        try:
+
+          if prompt.model is None:
+            model = DEFAULT_MODEL
+          else:
+            model = prompt.model
+
+          if prompt.prompt is None:
+            prompt.prompt = message
+
+
+          res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
+            "prompt": prompt.prompt,
+            "stream" : False,
+            "model" : model
+          })
+
+          return JSONResponse(content=res.text)
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+
+    #@app.post("/agent/test_models")
+    async def test_models(self):
+
+        agent_manager = AgentManager(max_retries=2, verbose=True)
+        agent = agent_manager.get_agent("models_perf_tool")
+
+
+        out = agent.execute(DEFAULT_MODEL)
+
+        return JSONResponse(
+                content=out
+            )
+
+
+    #@app.post("/agent/create_book")
+    async def create_book(self, prompt: Prompt):
+        try:
+
+          if prompt.model is None:
+            model = DEFAULT_MODEL
+          else:
+            model = prompt.model
+
+          if prompt.prompt is None:
+            prompt.prompt = message
+
+          concept = prompt.prompt
+
+
+
+          request_data = {"prompt":prompt}
+
+          agent_manager = AgentManager(max_retries=2, verbose=True)
+          agent = agent_manager.get_agent("write_book")
+
+
+          out = agent.execute()
+
+          return JSONResponse(
+                  content=out
+              )
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    #@app.get("/agent/create_curse")
+    async def create_curse(self):
+        try:
+          return {}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    #@app.get("/agent/create_tutorial")
+    async def create_tutorial(self):
+        try:
+          return {}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    #@app.get("/agent/benchmark_models")
+    def has_data(self, data):
+        try:
+          if len(data) > 0:
+            return True
+          else:
+            return False
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+
+    #@app.get("/agent/benchmark_models")
+    def benchmark_models(self):
+        try:
+          return {}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+    #@app.get("/agent/models")
+    async def models(self):
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{OLLAMA_BASE}/api/tags")
+                models = response.json()
+                return {
+                    "object": "list",
+                    "data": [{"id": model["name"],
+                             "object": "model",
+                             "created": int(time.time()),
+                             "owned_by": "organization-owner"}
+                            for model in models.get("models", [])]
+                }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+
 
     def agents(self):
         return {"agents": self.name}
@@ -323,194 +549,6 @@ async def update_item(
     return results
 
 
-
-@app.post("/agent/concepts")
-def list_concepts(prompt: Prompt):
-
-
-    if prompt.model is None:
-      model = DEFAULT_MODEL
-    else:
-      model = prompt.model
-
-    # Set the root concept and model
-    if prompt.prompt is None:
-      prompt.prompt = "How to make most easy revenue with AI Agents as a startup, convince seed investors"  # Default root concept
-
-    if prompt.amount is None:
-      prompt.amount = 10
-
-    concept = prompt.prompt
-    # Full path to current concept, including the concept itself
-    full_path = [concept]
-    amount = 20
-
-    # Prompt
-    prompt = f"""
-Starting with the concept: "{concept}", generate {amount} to 50, of the most close related concepts to our Starting concept.
-
-Context: We're building a concept web and have followed this path to get here:
-{' → '.join(full_path)}
-
-Guidelines:
-1. Seek maximum intellectual diversity - span across domains like science, art, philosophy, technology, culture, etc.
-2. Each concept should be expressed in 1-5 words (shorter is better)
-3. Avoid obvious associations - prefer surprising or thought-provoking connections
-4. Consider how your suggested concepts relate to BOTH:
-- The immediate parent concept "{concept}"
-- The overall path context: {' → '.join(full_path)}
-5. Consider these different types of relationships:
-- Metaphorical parallels
-- Contrasting opposites
-- Historical connections
-- Philosophical implications
-- Cross-disciplinary applications
-
-Avoid any concepts already in the path. Be creative but maintain meaningful connections.
-
-Return ONLY a JSON array of strings, with no explanation or additional text.
-Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Related concept 4","Related concept 5", "Related concept 6", "Related concept 7", "Related concept 8"]
-    """
-
-
-    res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
-      "prompt": prompt,
-      "stream" : False,
-      "model" : model
-    })
-
-    return JSONResponse(content=res.text)
-    #return {}
-
-
-
-@app.post("/custom")
-def custom_lake(prompt: Prompt):
-  try:
-
-    # Set the root concept and model
-    if prompt.prompt is None:
-      prompt.prompt = "How to make most easy revenue with AI Agents as a startup, convince seed investors"  # Default root concept
-
-    if prompt.amount is None:
-      prompt.amount = 10
-
-    request_data = {"prompt":prompt.prompt, "amount":prompt.amount}
-
-    agent_manager = AgentManager(max_retries=2, verbose=True)
-    agent = agent_manager.get_agent("hub_products")
-
-
-    out = agent.execute(agent_manager.model,prompt.prompt,1,prompt.amount)
-
-    return JSONResponse(
-            content=out
-        )
-
-  except Exception as e:
-      logger.error(f"Error listing models: {str(e)}")
-      raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
-@app.post("/agent/chat")
-def agent_chat(prompt: Prompt):
-    try:
-
-      if prompt.model is None:
-        model = DEFAULT_MODEL
-      else:
-        model = prompt.model
-
-      if prompt.prompt is None:
-        prompt.prompt = message
-
-
-      res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
-        "prompt": prompt.prompt,
-        "stream" : False,
-        "model" : model
-      })
-
-      return JSONResponse(content=res.text)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
-@app.post("/agent/test_models")
-async def test_models():
-
-    agent_manager = AgentManager(max_retries=2, verbose=True)
-    agent = agent_manager.get_agent("models_perf_tool")
-
-
-    out = agent.execute(DEFAULT_MODEL)
-
-    return JSONResponse(
-            content=out
-        )
-
-
-@app.post("/agent/create_book")
-async def create_book(prompt: Prompt):
-    try:
-
-      if prompt.model is None:
-        model = DEFAULT_MODEL
-      else:
-        model = prompt.model
-
-      if prompt.prompt is None:
-        prompt.prompt = message
-
-      concept = prompt.prompt
-
-
-
-      request_data = {"prompt":prompt}
-
-      agent_manager = AgentManager(max_retries=2, verbose=True)
-      agent = agent_manager.get_agent("write_book")
-
-
-      out = agent.execute()
-
-      return JSONResponse(
-              content=out
-          )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/agent/create_curse")
-async def create_curse():
-    try:
-      return {}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/agent/create_tutorial")
-async def create_tutorial():
-    try:
-      return {}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-@app.get("/agent/test_models")
-async def test_models():
-    try:
-      return {}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 #@app.get("/agent/benchmark_models")
 def has_data(data):
     try:
@@ -518,33 +556,6 @@ def has_data(data):
         return True
       else:
         return False
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-#@app.get("/agent/benchmark_models")
-def benchmark_models():
-    try:
-      return {}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/agent/models")
-async def models():
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{OLLAMA_BASE}/api/tags")
-            models = response.json()
-            return {
-                "object": "list",
-                "data": [{"id": model["name"],
-                         "object": "model",
-                         "created": int(time.time()),
-                         "owned_by": "organization-owner"}
-                        for model in models.get("models", [])]
-            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
