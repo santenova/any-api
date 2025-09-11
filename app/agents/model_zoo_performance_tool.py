@@ -233,11 +233,12 @@ class ModelValidator(AgentBase):
                     correct += 1
 
             toc = time.perf_counter()
+
             total = len(valid) + len(invalid)
             tpq = int(toc - tic) / total
             score = f"{correct / total:0.3f}"
             returns[model]={"model":model,"score":score,"correct":correct,"wrong":wrong,"false positives":fp,"false negatives":fn,"durration":f" {toc - tic:0.1f} seconds","time pro question":tpq}
-            bestscore=self.validate_results(returns,MODELS[0])
+            bestscore=self.validate_results(returns)
             print(f"\n\nTesting time: {toc - tic:0.4f} seconds")
             print(f"Model:{model} {score}")
             print("Total correct predictions:", correct)
@@ -249,6 +250,7 @@ class ModelValidator(AgentBase):
             #print(returns[model])
           except:
             pass
+
 
 
 
