@@ -15,6 +15,8 @@ from .hub_assign_agent import HubAssignAgent
 from .hub_products_agent import HubProductsAgent
 from .hub_contributions_agent import HubContributionsAgent
 
+from .model_zoo_performance_tool import ModelValidator
+
 class AgentManager:
     def __init__(self, max_retries=2, verbose=True):
         """
@@ -35,6 +37,7 @@ class AgentManager:
             "concept_tool": ConceptAgent( max_retries=max_retries, verbose=verbose),
             "write_book": WriteBookTool( max_retries=max_retries, verbose=verbose),
             "models": ModelsAgent( max_retries=max_retries, verbose=verbose),
+            "models_perf_tool": ModelValidator( max_retries=max_retries, verbose=verbose),
             # New hub command agents
             "hub_base": HubBaseAgent( max_retries=max_retries, verbose=verbose),
             "hub_document": HubDocumentAgent( max_retries=max_retries, verbose=verbose),

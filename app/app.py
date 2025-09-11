@@ -439,6 +439,22 @@ def agent_chat(prompt: Prompt):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+
+@app.post("/agent/test_models")
+async def test_models():
+
+    agent_manager = AgentManager(max_retries=2, verbose=True)
+    agent = agent_manager.get_agent("models_perf_tool")
+
+
+    out = agent.execute(DEFAULT_MODEL)
+
+    return JSONResponse(
+            content=out
+        )
+
+
 @app.post("/agent/create_book")
 async def create_book(prompt: Prompt):
     try:
@@ -461,7 +477,7 @@ async def create_book(prompt: Prompt):
       agent = agent_manager.get_agent("write_book")
 
 
-      out = agent.execute(prompt.prompt)
+      out = agent.execute()
 
       return JSONResponse(
               content=out

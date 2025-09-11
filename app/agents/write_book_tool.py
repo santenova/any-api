@@ -169,13 +169,36 @@ Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Relate
       summary = self.call_llama(messages, max_tokens=512)
       return json.loads(summary)
 
+    def create_keywords(self,user_query):
+      # Create a comprehensive prompt
+        prompt = f"""Create Keywords for this question
+
+Question: {user_query}
+
+Return ONLY a JSON array of strings, with no explanation or additional text.
+Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keyword 6", "Keyword 7", "Keyword 8"]
+"""
+        messages = [
+            {"role": "system", "content": "You are an AI assistant that creates keywords from text."},
+            {"role": "user", "content": prompt}
+        ]
+        keywords = self.call_llama(
+            messages=messages,
+            temperature=0.3,         # Lower temperature for more deterministic output
+            max_tokens=500
+        )
+
+        print(keywords.replace("```json","").replace("```",""))
+        return keywords
+
 
     def execute(self, topic, outline=None):
         system_message = "You are an expert writer."
         user_content = f"Write a research book on the following topic:\nTopic: {topic}\n\n"
         if outline is None:
-            outline = self.conceptual(topic)
-            user_content += f"Outline:\n{outline}\n\n"
+            outline = self.create_keywords(topic)
+            conceptual = self.conceptual(topic)
+            user_content += f"Outline:\n{conceptual}\nKeywors:{outline}\n\n"
 
 
         user_content += "Book:\n"
