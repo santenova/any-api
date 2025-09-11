@@ -52,17 +52,19 @@ docker run -p 8000:8000 -t any-api
 ## Testing
 
 ```
-
+# api health
 curl -X 'GET' \
   'http://0.0.0.0:8000/health' \
   -H 'accept: application/json';
 
 
+# available models via omalla
 curl -X 'GET' \
   'http://localhost:8000/agent/models' \
   -H 'accept: application/json';
 
 
+# basic chat
 curl -X 'POST' \
   'http://0.0.0.0:8000/agent/chat' \
   -H 'accept: application/json' \
@@ -73,11 +75,42 @@ curl -X 'POST' \
   "amount": 1
 }';
 
+# basic chat
 curl -X 'POST'   'http://0.0.0.0:8000/agent/create_book'   -H 'accept: application/json'   -H 'Content-Type: application/json'   -d '{
   "model":  "qwen3:0.6b",
   "prompt": "AI Agents",
   "amount": 1
-}'
+}';
+
+# shows db based chat rooms
+curl -X 'GET' \
+  'http://0.0.0.0:8000/rooms/sessions' \
+  -H 'accept: application/json';
+
+# adds db based chat room
+curl -X 'POST' \
+  'http://0.0.0.0:8000/rooms/new_session' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "title": "Product Creation",
+  "model_name": "Gemma2:latest"
+}';
+
+# start chating in room
+curl -X 'POST' \
+  'http://0.0.0.0:8000/rooms/sessions/1/messages' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "content": "create all required product information from this text:Model Meter The ultimate tool for evaluating model accuracy and performance",
+  "stream": false
+}';
+
+# download room as json file
+curl -X 'GET' \
+  'http://0.0.0.0:8000/rooms/sessions/1/export' \
+  -H 'accept: application/json'
 
 ```
 

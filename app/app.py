@@ -296,7 +296,7 @@ class Rooms:
                 # Update session title if this is the first exchange
                 if len(messages) <= 2:  # User message + assistant response
                     background_tasks.add_task(
-                        update_session_title_async,
+                        self.update_session_title_async,
                         db, session_id, ollama, session.model_name, message_data.content
                     )
 
@@ -360,7 +360,7 @@ class Rooms:
                     message_count = len(get_session_messages(db, session_id))
                     if message_count <= 2:
                         asyncio.create_task(
-                            update_session_title_async(
+                            self.update_session_title_async(
                                 db, session_id, ollama, session.model_name,
                                 conversation_history[-1]["content"]
                             )
@@ -389,6 +389,7 @@ class Rooms:
             title = await ollama.generate_title(model_name, first_message)
             update_session_title(db, session_id, title)
         except Exception:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
             pass  # Silently fail title generation
 
 
@@ -1028,5 +1029,3 @@ Tests both database and Ollama connectivity.
         data_subscription=has_subscription,
         data_products=has_products
     )
-
-
