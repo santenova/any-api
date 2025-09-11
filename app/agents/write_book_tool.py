@@ -9,6 +9,8 @@ class BookInfo(BaseModel):
   name: str
   keywords: list[str]
   text: list[str]
+  integrety:int
+
 
 class BookList(BaseModel):
   results: list[BookInfo]
@@ -165,7 +167,7 @@ Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Relate
 
 
       summary = self.call_llama(messages, max_tokens=512)
-      return summary
+      return json.loads(summary)
 
 
     def execute(self, topic, outline=None):
@@ -184,7 +186,7 @@ Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Relate
 
         #book = self.call_llama(messages, max_tokens=1000,format=BookList.model_json_schema())
         book = self.call_llama(messages, max_tokens=1024)
-        #book += self.conceptual(topic)
+        validation = self.validate_book(topic,book)
         """
         time.sleep(1000)
         book_summary = self.summarize(book)
@@ -202,4 +204,4 @@ Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Relate
             json.dump([messages,output_file,book,outline], f, ensure_ascii=False, indent=4)
 
 
-        return book
+        return {"topic":topic,"instructions":messages,"model":self.model,"book":book}

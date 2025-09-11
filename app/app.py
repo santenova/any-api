@@ -573,8 +573,9 @@ Tests both database and Ollama connectivity.
     ollama_connected = await ollama.health_check()
 
     models = await get_available_models()
-    random.shuffle(models)
-    model = "qwen3:0.6b"
+    random.shuffle(models['models'])
+
+    model =models['models']
     messages = []
     has_activity = has_data(activity)
     has_products = has_data(products)
