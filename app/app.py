@@ -654,34 +654,32 @@ class Agents:
 
     #@app.post("/agent/create_book")
     async def create_book(self, prompt: Prompt):
-        try:
-
-          if prompt.model is None:
-            model = DEFAULT_MODEL
-          else:
-            model = prompt.model
-
-          if prompt.prompt is None:
-            prompt.prompt = message
-
-          concept = prompt.prompt
 
 
+        if prompt.model is None:
+          model = DEFAULT_MODEL
+        else:
+          model = prompt.model
 
-          request_data = {"prompt":prompt}
+        if prompt.prompt is None:
+          prompt.prompt = message
 
-          agent_manager = AgentManager(max_retries=2, verbose=True)
-          agent = agent_manager.get_agent("write_book")
+        concept = prompt.prompt
 
 
-          out = agent.execute(concept)
 
-          return JSONResponse(
-                  content=out
-              )
+        request_data = {"prompt":prompt}
 
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        agent_manager = AgentManager(max_retries=2, verbose=True)
+        agent = agent_manager.get_agent("write_book")
+
+
+        out = agent.execute(concept)
+
+        return JSONResponse(
+                content=out
+            )
+
 
 
     #@app.get("/agent/create_curse")

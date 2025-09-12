@@ -59,24 +59,26 @@ curl -X 'GET' \
 
 
 # available models via omalla
-curl -X 'GET' \
-  'http://localhost:8000/agent/models' \
-  -H 'accept: application/json';
+curl -X 'POST' \
+  'http://localhost:8000/agents/models' \
+  -H 'accept: application/json' \
+  -d '';
+
 
 
 # basic chat
 curl -X 'POST' \
-  'http://0.0.0.0:8000/agent/chat' \
+  'http://localhost:8000/agents/chat' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "model": "qwen3:0.6b",
-  "prompt": "AI Agents",
-  "amount": 1
+  "model": "qwen2.5:0.5b",
+  "prompt": "What can you do best",
+  "amount": 0
 }';
 
 # basic chat
-curl -X 'POST'   'http://0.0.0.0:8000/agent/create_book'   -H 'accept: application/json'   -H 'Content-Type: application/json'   -d '{
+curl -X 'POST'   'http://0.0.0.0:8000/agents/create_book'   -H 'accept: application/json'   -H 'Content-Type: application/json'   -d '{
   "model":  "qwen3:0.6b",
   "prompt": "AI Agents",
   "amount": 1

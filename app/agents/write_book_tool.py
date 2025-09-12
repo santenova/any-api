@@ -24,10 +24,11 @@ class WriteBookTool(AgentBase):
     def validate_book(self, topic, book):
         text = f"""
                Given the topic and the research book below, assess whether the book comprehensively covers the topic, follows a logical structure, and maintains academic standards.
-               Provide a brief analysis and rate the book on a scale of 1 to 100, where 100 indicates excellent quality.
+               Provide a brief analysis and sore the book on a scale of 1 to 100, where 100% indicates excellent quality.
                Topic: {topic}
                Book:\n{book}
-               Validation:
+               Return ONLY a JSON
+               Example: {"score", "85%"}
                """
 
         messages = [
@@ -167,7 +168,7 @@ Example: ["Related concept 1", "Related concept 2", "Related concept 3", "Relate
 
 
       summary = self.call_llama(messages, max_tokens=512)
-      return json.loads(summary)
+      return summary
 
     def create_keywords(self,user_query):
       # Create a comprehensive prompt
@@ -195,10 +196,11 @@ Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keywo
     def execute(self, topic, outline=None):
         system_message = "You are an expert writer."
         user_content = f"Write a research book on the following topic:\nTopic: {topic}\n\n"
+
         if outline is None:
-            outline = self.create_keywords(topic)
-            conceptual = self.conceptual(topic)
-            user_content += f"Outline:\n{conceptual}\nKeywors:{outline}\n\n"
+            keywords = self.create_keywords(topic).replace("json```","").replace("```","")
+            outline = self.conceptual(topic).replace("json```","").replace("```","")
+            user_content += f"Outline:\n{outline}\nKeywors:{keywords}\n\n"
 
 
         user_content += "Book:\n"
@@ -207,11 +209,15 @@ Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keywo
             {"role": "user", "content": user_content}
         ]
 
-        #book = self.call_llama(messages, max_tokens=1000,format=BookList.model_json_schema())
+
+
         book = self.call_llama(messages, max_tokens=1024)
-        validation = self.validate_book(topic,book)
-        """
+
         time.sleep(1000)
+
+        validation = self.validate_book(topic,book)
+        print(validation)
+        """
         book_summary = self.summarize(book)
         time.sleep(1000)
         book_outline = self.outline(book)
@@ -220,11 +226,13 @@ Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keywo
         book_validated = self.validate_book(user_content,book)
         time.sleep(1000)
         summary_validated = self.validate_summerize(book,book_summary)
-        """
-        output_file = f"data/{self.model}_{topic.lower()}_book.txt"
+
+        output_file = f"data/{self.model}_book.txt"
 
         with open(output_file.replace(".txt",".json"), 'w', encoding='utf-8') as f:
             json.dump([messages,output_file,book,outline], f, ensure_ascii=False, indent=4)
+
+        """
 
 
         return {"topic":topic,"instructions":messages,"model":self.model,"book":book}
