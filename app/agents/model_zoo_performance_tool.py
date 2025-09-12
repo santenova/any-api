@@ -98,8 +98,12 @@ class ModelValidator(AgentBase):
     def validate_results(self,utterance):
 
         sorted_returns = dict(sorted(utterance.items(), key=lambda x: x[1]['score'], reverse=True))
-        for s in sorted_returns:
-          return {s:sorted_returns[s]['score']}
+
+        top5={}
+        for index, s in enumerate(sorted_returns):
+          top5[s]={"score":sorted_returns[s]['score'],"time pro question":sorted_returns[s]["time pro question"],"durration":sorted_returns[s]["durration"]}
+          if index == 5 or len(sorted_returns)<5:
+            return top5
 
 
     def main(self):

@@ -22,24 +22,18 @@ class WriteBookTool(AgentBase):
 
 
     def validate_book(self, topic, book):
-        text = f"""
-               Given the topic and the research book below, assess whether the book comprehensively covers the topic, follows a logical structure, and maintains academic standards.
-               Provide a brief analysis and sore the book on a scale of 1 to 100, where 100% indicates excellent quality.
-               Topic: {topic}
-               Book:\n{book}
-               Return ONLY a JSON
-               Example: {"score", "85%"}
-               """
-
-        messages = [
-            {"role": "system", "content": "You are an AI assistant that validates research books for accuracy, completeness, and adherence to academic standards."},
-            {"role": "user", "content": text}
-        ]
-        validation = self.call_llama(
-            messages=messages,
-            temperature=0.3,         # Lower temperature for more deterministic output
-            max_tokens=500
+        system_message = ""
+        user_content = (
+            "Provide a brief analysis and sore the book on a scale of 1 to 100, where 100% indicates excellent quality."
+            f"Topic:\n{topic}\n\n"
+            f"Book:\n{book}\n\n"
+            "Validation:"
         )
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_content}
+        ]
+        validation = self.call_llama(messages, max_tokens=512)
         return validation
 
 
@@ -143,7 +137,7 @@ class WriteBookTool(AgentBase):
             {
                 "role": "user",
                 "content": f"""
-Starting with the concept: "{text}", generate {1} to 30, of the most close related instances to our Starting concept.
+Starting with the concept: "{text}", generate {5} to 30, of the most close related instances to our Starting concept.
 #
 Guidelines:
 1. Seek maximum intellectual diversity - span across domains like science, art, philosophy, technology, culture, etc.
@@ -213,7 +207,7 @@ Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keywo
 
         book = self.call_llama(messages, max_tokens=1024)
 
-        time.sleep(1000)
+        time.sleep(1)
 
         validation = self.validate_book(topic,book)
         print(validation)
@@ -226,13 +220,12 @@ Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keywo
         book_validated = self.validate_book(user_content,book)
         time.sleep(1000)
         summary_validated = self.validate_summerize(book,book_summary)
-
+        """
         output_file = f"data/{self.model}_book.txt"
 
         with open(output_file.replace(".txt",".json"), 'w', encoding='utf-8') as f:
             json.dump([messages,output_file,book,outline], f, ensure_ascii=False, indent=4)
 
-        """
 
 
-        return {"topic":topic,"instructions":messages,"model":self.model,"book":book}
+        return {"topic":topic,"instructions":messages,"model":self.model,"book":book,"validation":validation,"file":output_file}
