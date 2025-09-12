@@ -1,15 +1,20 @@
+import  sys, os
 from sqlalchemy.orm import Session
 import requests
 from pydantic import BaseModel, Field
 from typing import Annotated, Literal
 from typing import Optional, List, Dict, Any
 from fastapi import Depends, BackgroundTasks, APIRouter
-
-
 from dotenv import load_dotenv
 
 load_dotenv()
 
+from .agents.agent_manager import AgentManager
+
+
+
+OLLAMA_BASE = os.getenv('OLLAMA_BASE', 'http://ollama:11434')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
 # Import our custom modules
 from database import (
     create_tables, get_db, create_chat_session, get_chat_session,
@@ -514,7 +519,7 @@ class Agents:
 
 
         if prompt.model is None:
-          model = DEFAULT_MODEL
+          model = OLLAMA_MODEL
         else:
           model = prompt.model
 
@@ -604,7 +609,7 @@ class Agents:
         try:
 
           if prompt.model is None:
-            model = DEFAULT_MODEL
+            model = OLLAMA_MODEL
           else:
             model = prompt.model
 
@@ -634,7 +639,7 @@ class Agents:
         agent = agent_manager.get_agent("models_perf_tool")
 
 
-        out = agent.execute(DEFAULT_MODEL)
+        out = agent.execute(OLLAMA_MODEL)
 
         return JSONResponse(
                 content=out
@@ -646,7 +651,7 @@ class Agents:
 
 
         if prompt.model is None:
-          model = DEFAULT_MODEL
+          model = OLLAMA_MODEL
         else:
           model = prompt.model
 

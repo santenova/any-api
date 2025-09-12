@@ -48,7 +48,7 @@ from app.agents.agent_base import AgentBase
 from app.utils.logger import logger
 
 OLLAMA_BASE = os.getenv('OLLAMA_BASE', 'http://ollama:11434')
-DEFAULT_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
 FAVICON_PATH = 'favicon.ico'
 
 # Application lifecycle management
