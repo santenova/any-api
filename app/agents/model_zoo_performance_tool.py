@@ -53,7 +53,7 @@ data: {json}
 """
 
 OLLAMA_BASE = os.getenv('OLLAMA_BASE')
-DEFAULT_MODEL = os.getenv('DEFAULT_MODEL')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL')
 
 class ModelValidator(AgentBase):
     def __init__(self, max_retries=2, verbose=True):

@@ -27,7 +27,7 @@ from ..utils.logger import logger
 init(autoreset=True)
 
 OLLAMA_BASE = os.getenv('OLLAMA_BASE')
-DEFAULT_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
 FAVICON_PATH = 'favicon.ico'
 
 class ProductExplorer:

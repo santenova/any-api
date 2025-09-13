@@ -211,7 +211,7 @@ Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keywo
 
         validation = self.validate_book(topic,book)
         print(validation)
-        """
+
         book_summary = self.summarize(book)
         time.sleep(1000)
         book_outline = self.outline(book)
@@ -220,7 +220,6 @@ Example: ["Keyword 1", "Keyword 2", "Keyword 3", "Keyword 4","Keyword 5", "Keywo
         book_validated = self.validate_book(user_content,book)
         time.sleep(1000)
         summary_validated = self.validate_summerize(book,book_summary)
-        """
         output_file = f"data/{self.model}_book.txt"
 
         with open(output_file.replace(".txt",".json"), 'w', encoding='utf-8') as f:
