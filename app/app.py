@@ -20,19 +20,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import our custom modules
-from database import (
+from app.db_chat import (
     create_tables, get_db, create_chat_session, get_chat_session,
     get_all_chat_sessions, add_message, get_session_messages,
     delete_chat_session, update_session_title, ChatSession, Message
 )
-from ollama_service import (
+from app.ollama_service import (
     get_ollama_service, close_ollama_service, OllamaService,
     OllamaConnectionError, OllamaModelError
 )
 
 
 
-from app.db import User, create_db_and_tables
+from app.db_auth import User, create_db_and_tables
 from app.schemas import UserCreate, UserRead, UserUpdate
 from app.users import (
     SECRET,
@@ -47,9 +47,13 @@ from app.classes import (Products, Agents, Git, Base44, Rooms, Item, User, Annot
 from app.agents.agent_base import AgentBase
 from app.utils.logger import logger
 
-OLLAMA_BASE = os.getenv('OLLAMA_BASE', 'http://ollama:11434')
+OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://ollama:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
 FAVICON_PATH = 'favicon.ico'
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+
 
 # Application lifecycle management
 @asynccontextmanager
@@ -59,8 +63,8 @@ Application lifespan manager.
 Handles startup and shutdown tasks like database initialization.
     """
     # Startup
-    if OLLAMA_BASE:
-      print("🚀 Ollama base url: "+OLLAMA_BASE)
+    if OLLAMA_HOST:
+      print("🚀 Ollama base url: "+OLLAMA_HOST)
 
     # Create database tables
     try:
@@ -136,6 +140,21 @@ app.include_router(
     tags=["auth"],
 )
 
+
+# Add middlewares in correct order
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"]
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["X-Total-Count", "X-Request-ID"]
+)
 
 
 

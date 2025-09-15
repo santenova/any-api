@@ -1,10 +1,12 @@
-import  sys, os, time
+import  sys, os, time, json, asyncio
 from sqlalchemy.orm import Session
 import requests
 from pydantic import BaseModel, Field
 from typing import Annotated, Literal
 from typing import Optional, List, Dict, Any
 import httpx
+from datetime import datetime
+
 
 
 
@@ -21,19 +23,24 @@ from .agents.agent_manager import AgentManager
 
 
 
-OLLAMA_BASE = os.getenv('OLLAMA_BASE', 'http://ollama:11434')
+OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://ollama:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
+
 # Import our custom modules
-from database import (
+from app.db_chat import (
     create_tables, get_db, create_chat_session, get_chat_session,
     get_all_chat_sessions, add_message, get_session_messages,
-    delete_chat_session, update_session_title, ChatSession, Message
+    delete_chat_session, update_session_title, ChatSession, Message,
+    get_chat_session_by_title
 )
-from ollama_service import (
+from app.ollama_service import (
     get_ollama_service, close_ollama_service, OllamaService,
     OllamaConnectionError, OllamaModelError
 )
 
+
+
+from app.db_auth import User, create_db_and_tables
 
 
 class FilterParams(BaseModel):
@@ -71,7 +78,10 @@ class ChatSessionResponse(BaseModel):
 class SendMessageRequest(BaseModel):
     """Model for sending messages to chat sessions."""
     content: str = Field(..., description="User message content")
-    stream: bool = Field(True, description="Whether to stream the response")
+    stream: bool = Field(False, description="Whether to stream the response")
+
+class SendModelTestRequest(BaseModel):
+    """Model for sending messages to chat sessions."""
 
 
 class UpdateSessionTitleRequest(BaseModel):
@@ -113,11 +123,11 @@ class Rooms:
     def __init__(self, name: str):
         self.name = name
         self.router = APIRouter()
-        self.router.get("/hello")(self.hello) # use decorator
         self.router.get("/get_available_models")(self.get_available_models) # use decorator
         self.router.get("/sessions")(self.get_chat_sessions) # use decorator
         self.router.post("/new_session")(self.create_new_chat_session) # use decorator
         self.router.post("/sessions/{session_id}")(self.get_chat_session_details) # use decorator
+        self.router.get("/sessions/{session_id}")(self.get_chat_session_details) # use decorator
         self.router.post("/sessions/{session_id}/messages")(self.send_message) # use decorator
         self.router.put("/sessions/{session_id}/title")(self.update_chat_session_title) # use decorator
         self.router.delete("/sessions/{session_id}")(self.delete_chat_session_endpoint) # use decorator
@@ -258,9 +268,10 @@ class Rooms:
             # Verify session exists
             session = get_chat_session(db, session_id)
             if not session:
+                # Create session in database
                 raise HTTPException(status_code=404, detail="Chat session not found")
 
-            # Store user message
+          # Store user message
             user_message = add_message(db, session_id, "user", message_data.content)
 
             # Get conversation history for context
@@ -279,7 +290,7 @@ class Rooms:
             if message_data.stream:
                 # Return streaming response
                 return StreamingResponse(
-                    stream_chat_response(ollama, session, conversation_history, db, session_id),
+                    self.stream_chat_response(ollama, session, conversation_history, db, session_id),
                     media_type="text/plain"
                 )
             else:
@@ -519,6 +530,7 @@ class Agents:
         self.router.post("/model_meter")(self.test_models) # use decorator
         self.router.post("/create_book")(self.create_book) # use decorator
         self.router.post("/models")(self.models) # use decorator
+        self.router.post("/proxy")(self.send_message) # use decorator
 
 
 
@@ -571,13 +583,18 @@ class Agents:
         """
 
 
-        res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
+        res = requests.post(f"{OLLAMA_HOST}/api/generate", json={
           "prompt": prompt,
           "stream" : False,
           "model" : model
         })
 
-        return JSONResponse(content=res.text)
+        export_data = res.text
+        return JSONResponse(
+                content=export_data,
+                #headers={"Content-Disposition": f"attachment; filename=chat_{concept}.json"}
+            )
+        #return JSONResponse(content=res.text)
         #return {}
 
 
@@ -600,9 +617,10 @@ class Agents:
 
 
         out = agent.execute(agent_manager.model,prompt.prompt,1,prompt.amount)
-
+        export_data = out
         return JSONResponse(
-                content=out
+                content=export_data,
+                #headers={"Content-Disposition": f"attachment; filename=chat_{prompt.prompt}.json"}
             )
 
       except Exception as e:
@@ -625,13 +643,18 @@ class Agents:
             prompt.prompt = message
 
 
-          res = requests.post(f"{OLLAMA_BASE}/api/generate", json={
+          res = requests.post(f"{OLLAMA_HOST}/api/generate", json={
             "prompt": prompt.prompt,
             "stream" : False,
             "model" : model
           })
 
-          return JSONResponse(content=res.text)
+          export_data = res.text
+          return JSONResponse(
+                content=export_data,
+                #headers={"Content-Disposition": f"attachment; filename=chat_{prompt.prompt}.json"}
+            )
+
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -641,18 +664,150 @@ class Agents:
 
 
     #@app.post("/agent/test_models")
-    async def test_models(self):
+    async def test_models(self,
+                          background_tasks: BackgroundTasks,
+                          db: Session = Depends(get_db)):
 
+
+
+        agent_name = "models_perf_tool"
         agent_manager = AgentManager(max_retries=2, verbose=True)
-        agent = agent_manager.get_agent("models_perf_tool")
+        agent = agent_manager.get_agent(agent_name)
+        user = "user"
+        content=f"{user}:{agent_name}:{OLLAMA_HOST}"
+
+        session = get_chat_session_by_title(db,content)
+        if session:
+          print(session)
+        else:
+          session = create_chat_session(db,content, agent_manager.model)
 
 
-        out = agent.execute(OLLAMA_MODEL)
+        # Store user message
+        user_message = add_message(db, session.id,user, content)
 
-        return JSONResponse(
-                content=out
+        # Get conversation history for context
+        messages = get_session_messages(db, session.id, limit=20)  # Last 20 messages
+        conversation_history = []
+        for msg in messages:
+            conversation_history.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+
+
+        # Store assistant response
+        response_content = agent.execute(OLLAMA_MODEL)
+
+        assistant_message = add_message(db, session.id, "assistant", json.dumps(response_content))
+
+
+
+        return {
+            "user_message": {
+                "id": user_message.id,
+                "session_id": session.id,
+                "content": user_message.content,
+                "timestamp": user_message.created_at.isoformat()
+
+            },
+            "assistant_message": {
+                "id": assistant_message.id,
+                "session_id": session.id,
+                "content": assistant_message.content,
+                "timestamp": assistant_message.created_at.isoformat()
+            }
+        }
+
+
+
+    async def send_message(self,
+            session_id: int,
+            message_data: SendMessageRequest,
+            background_tasks: BackgroundTasks,
+            db: Session = Depends(get_db)
+    ):
+        """
+    Send a message to a chat session and get LLM response.
+    Supports both streaming and non-streaming responses.
+        """
+        agent_manager = AgentManager(max_retries=2, verbose=True)
+
+        #try:
+        # Verify session exists
+        session = get_chat_session(db, session_id)
+        if not session:
+            print(message_data)
+            session = create_chat_session(db, message_data.content, agent_manager.model)
+            #raise HTTPException(status_code=404, detail="Chat session not found")
+
+        # Store user message
+        user_message = add_message(db, session.id, "user", message_data.content)
+
+        # Get conversation history for context
+        messages = get_session_messages(db, session.id, limit=20)  # Last 20 messages
+        conversation_history = []
+
+        for msg in messages:
+            conversation_history.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+
+        # Get Ollama service and send request
+        ollama = await get_ollama_service()
+
+        if message_data.stream:
+            # Return streaming response
+            return StreamingResponse(
+                Rooms(self).stream_chat_response(ollama, session, conversation_history, db, session.id),
+                media_type="text/plain"
             )
+        else:
+            # Return complete response
+            response_content = ""
+            async for chunk in ollama.chat_completion(
+                session.model_name,
+                conversation_history,
+                stream=False
+            ):
+                response_content = chunk.get("message", {}).get("content", "")
 
+            # Store assistant response
+            assistant_message = add_message(db, session.id, "assistant", response_content)
+
+            # Update session title if this is the first exchange
+            if len(messages) <= 2:  # User message + assistant response
+                background_tasks.add_task(
+                    Rooms(self).update_session_title_async,
+                    db, session.id, ollama, agent_manager.model, message_data.content
+                )
+
+            return {
+                "user_message": {
+                    "id": user_message.id,
+                    "session_id": session.id,
+                    "content": user_message.content,
+                    "timestamp": user_message.created_at.isoformat()
+
+                },
+                "assistant_message": {
+                    "id": assistant_message.id,
+                    "session_id": session.id,
+                    "content": assistant_message.content,
+                    "timestamp": assistant_message.created_at.isoformat()
+                }
+            }
+        """
+        except HTTPException:
+            raise
+        except OllamaConnectionError as e:
+            raise HTTPException(status_code=503, detail=f"LLM service unavailable: {e}")
+        except OllamaModelError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Faile1d to process message: {e}")
+        """
 
     #@app.post("/agent/create_book")
     async def create_book(self, prompt: Prompt):
@@ -678,8 +833,10 @@ class Agents:
 
         out = agent.execute(concept)
 
+        export_data = out
         return JSONResponse(
-                content=out
+                content=export_data,
+                #headers={"Content-Disposition": f"attachment; filename=chat_{prompt.prompt}.json"}
             )
 
 
@@ -723,8 +880,14 @@ class Agents:
     async def models(self):
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get(f"{OLLAMA_BASE}/api/tags")
+                response = await client.get(f"{OLLAMA_HOST}/api/tags")
                 models = response.json()
+                export_data = models
+                return JSONResponse(
+                        content=export_data,
+                        #headers={"Content-Disposition": f"attachment; filename=chat_models.json"}
+                    )
+                """
                 return {
                     "object": "list",
                     "data": [{"id": model["name"],
@@ -733,6 +896,7 @@ class Agents:
                              "owned_by": "organization-owner"}
                             for model in models.get("models", [])]
                 }
+                """
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 

@@ -5,7 +5,7 @@
 
 ```
 cat .env
-OLLAMA_BASE=http://localhost:11434
+OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=qwen3:0.6b
 ```
 
@@ -36,7 +36,7 @@ python3.10 main.py
 
 ```
 cat .env
-OLLAMA_BASE=http://ollama:11434
+OLLAMA_HOST=http://ollama:11434
 OLLAMA_MODEL=qwen3:0.6b
 ```
 
@@ -108,6 +108,11 @@ curl -X 'POST' \
   "content": "create all required product information from this text:Model Meter The ultimate tool for evaluating model accuracy and performance",
   "stream": false
 }';
+
+curl -X 'POST' \
+  'http://127.0.0.1:8000/rooms/sessions/1' \
+  -H 'accept: application/json' \
+  -d '{}';
 
 # download room as json file
 curl -X 'GET' \

@@ -12,7 +12,7 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx_oauth.clients.google import GoogleOAuth2
 
-from app.db import User, get_user_db
+from app.db_auth import User, get_user_db
 
 SECRET = "SECRET"
 

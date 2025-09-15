@@ -111,6 +111,14 @@ def create_chat_session(db: Session, title: str, model_name: str) -> ChatSession
         raise Exception(f"Failed to create chat session: {e}")
 
 
+def get_chat_session_by_title(db: Session, title: str) -> Optional[ChatSession]:
+    """Retrieve a chat session by ID with its messages."""
+    try:
+        return db.query(ChatSession).filter(ChatSession.id == title).first()
+    except SQLAlchemyError as e:
+        raise Exception(f"Failed to retrieve chat session: {e}")
+
+
 def get_chat_session(db: Session, session_id: int) -> Optional[ChatSession]:
     """Retrieve a chat session by ID with its messages."""
     try:

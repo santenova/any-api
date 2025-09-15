@@ -26,7 +26,7 @@ from ..utils.logger import logger
 # Initialize colorama
 init(autoreset=True)
 
-OLLAMA_BASE = os.getenv('OLLAMA_BASE')
+OLLAMA_HOST = os.getenv('OLLAMA_HOST')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL',"qwen3:0.6b")
 FAVICON_PATH = 'favicon.ico'
 
@@ -43,7 +43,7 @@ class ProductExplorer:
 
     def query_ollama(self, prompt):
         """Query Ollama using the generate API."""
-        url = f"{OLLAMA_BASE}/api/generate"
+        url = f"{OLLAMA_HOST}/api/generate"
         headers = {"Content-Type": "application/json"}
         data = {
             "model": self.model,

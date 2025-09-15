@@ -16,8 +16,8 @@ from datetime import datetime
 import json
 
 # Ollama configuration
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_TIMEOUT = 120  # seconds for LLM responses
+OLLAMA_HOST_URL = os.getenv("OLLAMA_HOST_URL", "http://localhost:11434")
+OLLAMA_TIMEOUT = 370  # seconds for LLM responses
 CONNECTION_TIMEOUT = 10  # seconds for connection attempts
 
 
@@ -37,7 +37,7 @@ Service class for interacting with Ollama API.
 Handles model management, chat completions, and error handling.
 """
 
-    def __init__(self, base_url: str = OLLAMA_BASE_URL):
+    def __init__(self, base_url: str = OLLAMA_HOST_URL):
         self.base_url = base_url.rstrip('/')
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(CONNECTION_TIMEOUT, read=OLLAMA_TIMEOUT),
